@@ -1,0 +1,15 @@
+GPIO13 - left side
+
+GPIO12 - AVOID from use due to strapping pin. Must not be high during boot!
+
+GPIO14 - left front
+GPIO27 - middle
+GPIO26 - right front
+GPIO25 - right side
+GPIO33 - start button
+GPIO32 - tactical dipswitch
+
+GPIO35 - right line (analog input only)
+GPIO34 - left line (analog input only)
+
+34 35 32 33 25 26 27 14 12 13
