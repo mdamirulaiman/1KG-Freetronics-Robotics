@@ -79,7 +79,7 @@ void setup() {
   pinMode(LEdge, INPUT);
   pinMode(REdge, INPUT);
   //Motor Connection
-  PinMode(LPWM_1, OUTPUT);
+  pinMode(LPWM_1, OUTPUT);
   pinMode(LPWM_2, OUTPUT);
   pinMode(RPWM_1, OUTPUT);
   pinMode(RPWM_2, OUTPUT);
