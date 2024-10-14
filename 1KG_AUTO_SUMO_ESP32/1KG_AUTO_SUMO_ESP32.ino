@@ -35,38 +35,35 @@
 #define EEADD_EDGE_L 0
 #define EEADD_EDGE_R (EEADD_EDGE_L + sizeof(int))
 
-// Default value for edge sensors threshold if not calibrated.
-#define DEFAULT_EDGE_THRESHOLD 650
+#define DEFAULT_EDGE_THRESHOLD 650  // Default value for edge sensors threshold if not calibrated.
 int EDGE_L_THRESHOLD, EDGE_R_THRESHOLD;
-// Time window for entering edge line calibration mode
-#define CALIBRATION_DELAY 500
+#define CALIBRATION_DELAY 500 // Time window for entering edge line calibration mode
 // Variables
 #define LEFT 0
 #define RIGHT 1
 int duration = 5;  // 5 SECOND start delay
 int searchDir = LEFT;
 int IdleSpeed = 50;
-int MaxSpeed = 80;
-//Pin Assignment modified
+int MaxSpeed = 100;
+
+//Pin Assignment
 int LPWM_1 = 18;   // Left motor forward
 int LPWM_2 = 16;   // Left motor backward
 int RPWM_1 = 19;  // Right motor forward
 int RPWM_2 = 17;  // Right motor backward
 
-int REdge = A1;  // Right Line Sensor
-int LEdge = A0;  // Left Line Sensor
+int REdge = 35;  // Right Line Sensor
+int LEdge = 34;  // Left Line Sensor
 
 int LSens = 13;  // Left opponent sensor
-int LFSens = 7;  // Left front opponent sensor
-int MSens = 6;   // Middle opponent sensor
-int RFSens = 5;  // Right front opponent sensor
-int RSens = 12;  // Right opponent Sensor
+int LFSens = 14;  // Left front opponent sensor
+int MSens = 27;   // Middle opponent sensor
+int RFSens = 26;  // Right front opponent sensor
+int RSens = 25;  // Right opponent Sensor
 
-int start = 2;   // Start button
+int Start = 33;   // Start button
+int Dipswitch = 32;  // Tactic dipswitch 3
 int OB_LED = 2;
-//int trimpot = A5;    // trimpot pin
-int dipswitch = A6;  // Tactic dipswitch 3
-//int voltage = A7;    // battery voltage reading
 
 void setup() {
   Serial.begin(9600);  // Computer & Arduino Interface started in 9600 bits per second, We need to write for usb communication debug.
@@ -89,19 +86,15 @@ void setup() {
   
   //Board connection
   pinMode(OB_LED, OUTPUT);
-  pinMode(dipswitch, INPUT);  // tactic switch input
-  pinMode(start, INPUT_PULLUP);      //start button input
-  //pinMode(voltage, INPUT);
+  pinMode(Dipswitch, INPUT);  // tactic switch input
+  pinMode(Start, INPUT_PULLUP);      //start button input
 
-  analogWrite(RPWM_1, 0);
-  analogWrite(RPWM_2, 0);
-  analogWrite(LPWM_1, 0);
-  analogWrite(LPWM_1, 0);
+  stopmotor(); // Stop motor during initial start-up
 
   while (millis() < CALIBRATION_DELAY) {
     digitalWrite(OB_LED, HIGH);
     Serial.println("Press Start for Calibration");
-    if (!digitalRead(start)) {
+    if (!digitalRead(Start)) {
       Serial.println("Calibrating starts in 3");
       digitalWrite(OB_LED, HIGH);
       delay(500);
@@ -122,22 +115,18 @@ void setup() {
   digitalWrite(OB_LED, LOW);
   EDGE_L_THRESHOLD = sensorThreshold(LEFT);
   EDGE_R_THRESHOLD = sensorThreshold(RIGHT);
-
-
   startRoutine();
 }
 
 void loop() {
-  //IdleSpeed = map(analogRead(trimpot), 0, 1023, 0, 100);
-  //MaxSpeed = 1.6 * map(analogRead(trimpot), 0, 1023, 0, 100);
   if (analogRead(LEdge) < EDGE_L_THRESHOLD && analogRead(REdge) > EDGE_R_THRESHOLD) {
-    delay(20);
+    delay(20); // Double sensing method to prevent stray line
     if (analogRead(LEdge) < EDGE_L_THRESHOLD && analogRead(REdge) > EDGE_R_THRESHOLD) {
       backoff(RIGHT);
       searchDir ^= 1;
     }
   } else if (analogRead(REdge) < EDGE_R_THRESHOLD && analogRead(LEdge) > EDGE_L_THRESHOLD) {
-    delay(20);
+    delay(20); // Double sensing method to prevent stray line
     if (analogRead(REdge) < EDGE_R_THRESHOLD && analogRead(LEdge) > EDGE_L_THRESHOLD) {
       backoff(LEFT);
       searchDir ^= 1;
@@ -145,11 +134,11 @@ void loop() {
   } else {
     if (digitalRead(LSens) && digitalRead(MSens) && digitalRead(RSens) && digitalRead(RFSens) && digitalRead(LFSens)) {
       search();
-    } else {  //kalau sensor detected call function attack
+    } else {
       attack();
     }
   }
-  if (!digitalRead(start)) {
+  if (!digitalRead(Start)) {  // Start button pressed again to stop robot
     Serial.println("Sumo Stop");
     stopmotor();
     delay(1000);
@@ -163,20 +152,17 @@ void loop() {
 *******************************************************************************/
 void startRoutine() {
   //delay(500);
-  while (digitalRead(start)) {
+  while (digitalRead(Start)) {
     sensordebug();
-    if (analogRead(LEdge) < 500 || analogRead(REdge) < 500) {
+    if (analogRead(LEdge) < EDGE_L_THRESHOLD || analogRead(REdge) < EDGE_R_THRESHOLD) {
       digitalWrite(OB_LED, HIGH);
     } else {
       digitalWrite(OB_LED, LOW);
     }
-    delay(20);
   }
-  if (!digitalRead(start))
+  if (!digitalRead(Start));
   // What's here ??
-    ;
   Serial.println("Start Sumo");
-
   for (int i = 1; i <= duration; i++) {  //set delay time
     digitalWrite(OB_LED, HIGH);
     delay(700);
@@ -185,11 +171,10 @@ void startRoutine() {
   }
 
   uint32_t startTimestamp = millis();
-
   if (readDipSwitch() == 0) {  // forward attack
     Set_Motor(50, 50);
     delay(30);
-    stopmotor();
+    //stopmotor();
   }
 
   else if (readDipSwitch() == 1) {  //90 right
@@ -209,7 +194,7 @@ void startRoutine() {
   else if (readDipSwitch() == 2) {  //forward atttack
     Set_Motor(50, 50);
     delay(30);
-    stopmotor();
+    //stopmotor();
   }
 
   else if (readDipSwitch() == 3) {  //moon right
@@ -379,7 +364,7 @@ void search() {
   } else {
     Set_Motor(IdleSpeed, IdleSpeed);
   }
-  delay(10);
+  //delay(10);
 }
 
 /*******************************************************************************
@@ -394,16 +379,16 @@ void backoff(uint8_t dir) {
 
   // Rotate..
   if (dir == LEFT) {
-    Set_Motor(-50, 50);
+    Set_Motor(-50, 70);
   } else {
-    Set_Motor(50, -50);
+    Set_Motor(70, -50);
   }
-  delay(250);
+  delay(200);
 
   // Start looking for opponent.
   // Timeout after a short period.
   uint32_t uTurnTimestamp = millis();
-  while (millis() - uTurnTimestamp < 75) {
+  while (millis() - uTurnTimestamp < 150) {
     // Opponent is detected if either one of the opponent sensor is triggered.
     if (!digitalRead(LSens) || !digitalRead(LFSens) || !digitalRead(MSens) || !digitalRead(RFSens) || !digitalRead(RSens)) {
       // Stop the motors.
@@ -417,7 +402,7 @@ void backoff(uint8_t dir) {
 }
 
 int readDipSwitch() {
-  int adc = analogRead(dipswitch);
+  int adc = analogRead(Dipswitch);
   if (adc > 933) return 0;
   if (adc > 773) return 1;
   if (adc > 658) return 2;
@@ -427,13 +412,14 @@ int readDipSwitch() {
   if (adc > 400) return 6;
   return 7;
 }
-
+/*
 float readBatteryVoltage() {
   int adc = analogRead(voltage);
   float adcvolt = (float)adc * (5.0f / 1023.0f);
   float vbatt = adcvolt * (1.0f + (10.0f / 3.9f));
   return vbatt;
 }
+*/
 
 void calibrateEdgeSensor() {
   int minL = 1024;
@@ -456,31 +442,25 @@ void calibrateEdgeSensor() {
       timestamp += 100;
       Serial.println("Calibrating...");
       digitalWrite(OB_LED, !digitalRead(OB_LED));
-      tone(buzzer, 523, 100);
-      noTone(buzzer);
+      delay(100);
     }
-  } while (digitalRead(start));
-  while (!digitalRead(start))
-    ;
-  Serial.println("DONE CALIBRATE wait for values");
+  } while (digitalRead(Start));
+
+  while (!digitalRead(Start));
+  Serial.println("DONE CALIBRATE. Printing out values");
   digitalWrite(OB_LED, HIGH);
-  tone(buzzer, 523, 500);
   delay(500);
   digitalWrite(OB_LED, LOW);
-  noTone(buzzer);
   delay(500);
   digitalWrite(OB_LED, HIGH);
-  tone(buzzer, 125, 500);
   delay(500);
   digitalWrite(OB_LED, LOW);
-  noTone(buzzer);
   delay(500);
   digitalWrite(OB_LED, HIGH);
-  tone(buzzer, 750, 500);
   delay(500);
   digitalWrite(OB_LED, LOW);
-  noTone(buzzer);
   delay(500);
+
   if (maxL > minL) {
     int threshold = ((maxL - minL) * 3 / 5) + minL;
     EEPROM.writeInt(EEADD_EDGE_L, threshold);
@@ -507,8 +487,7 @@ int sensorThreshold(int side) {
   } else {
     return 0;
   }
-  int threshold;
-  EEPROM.readInt(eepromAddress, threshold);
+  int threshold = EEPROM.readInt(eepromAddress);
 
   if ((threshold <= 0) || (threshold >= 1023)) {
     threshold = DEFAULT_EDGE_THRESHOLD;
@@ -548,16 +527,17 @@ void stopmotor() {
 }
 
 void sensordebug() {
-  //int speed = analogRead(trimpot);
-  int tactic = analogRead(dipswitch);
+  int tactic = analogRead(Dipswitch);
   Serial.print("Start Button : ");
-  Serial.print(digitalRead(start));
-  Serial.print("   ");
+  Serial.print(digitalRead(Start));
+  Serial.print("\t");
+
   Serial.print("Dipswitch : ");
   Serial.print(readDipSwitch());
   Serial.print(" | ");
   Serial.print(tactic);
   Serial.print("\t");
+
   //Serial.print("Trimpot : ");
   //Serial.print(speed);
   //Serial.print("\t");
@@ -569,6 +549,7 @@ void sensordebug() {
   Serial.print(" | ");
   Serial.print(analogRead(REdge));
   Serial.print("\t");
+
   Serial.print("Opponent Sensor : ");
   Serial.print(digitalRead(LSens));
   Serial.print(digitalRead(LFSens));
